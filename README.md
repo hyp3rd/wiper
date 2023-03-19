@@ -48,7 +48,9 @@ This software is provided as is, without any warranty. Use it at your own risk. 
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper?ref=badge_large)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper?ref=badge_large)
 
 ## Author
 
