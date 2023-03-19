@@ -1,4 +1,6 @@
 # WIPER
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper?ref=badge_shield)
+
 
 Shell script to securely wipe specific files or folders, or cover your tracks on UNIX systems.
 Designed for private people...
@@ -41,3 +43,7 @@ chmod +x /usr/local/bin/wiper
 - **-r**, **--recursive**   Enable the main commands {wipe, erase, remove} to run recursive against any sub-directory; e.g., - `wiper wipe /your/path_or_file --recursive`
 
 Use `wiper [command] --help` for more information about a command (not yet implemented).
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper?ref=badge_large)
