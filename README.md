@@ -11,10 +11,10 @@ This script is intended to be used solely for testing purposes.
 `wiper.sh` works on UNIX-like systems (e.g., Linux distros, macOS). Install it as follows:
 
 ```bash
-wget --quiet -O /usr/local/bin/wiper "https://github.com/hyp3rd/wiper/-/raw/master/wiper.sh";
+wget --quiet -O /usr/local/bin/wiper "https://raw.githubusercontent.com/hyp3rd/wiper/main/wiper.sh";
 chmod +x /usr/local/bin/wiper
 # or
-curl -o /usr/local/bin/wiper "https://github.com/hyp3rd/wiper/-/raw/master/wiper.sh"
+curl -o /usr/local/bin/wiper "https://raw.githubusercontent.com/hyp3rd/wiper/main/wiper.sh"
 chmod +x /usr/local/bin/wiper
 ```
 
@@ -41,3 +41,15 @@ chmod +x /usr/local/bin/wiper
 - **-r**, **--recursive**   Enable the main commands {wipe, erase, remove} to run recursive against any sub-directory; e.g., - `wiper wipe /your/path_or_file --recursive`
 
 Use `wiper [command] --help` for more information about a command (not yet implemented).
+
+## Disclaimer
+
+This software is provided as is, without any warranty. Use it at your own risk. The author is not responsible for any damage caused by this software.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fhyp3rd%2Fwiper?ref=badge_large)
+
+## Author
+
+I'm a surfer, a crypto trader, and a software architect with 15 years of experience designing highly available distributed production environments and developing cloud-native apps in public and private clouds. Feel free to hook me up on [LinkedIn](https://www.linkedin.com/in/francesco-cosentino/).
