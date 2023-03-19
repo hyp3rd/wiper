@@ -1,0 +1,35 @@
+---
+stages:
+  - test
+
+shell check:
+  image: koalaman/shellcheck-alpine:stable
+  stage: test
+  before_script:
+    - shellcheck --version
+  script:
+    - shellcheck ./*.sh
+
+shfmt:
+  image: mvdan/shfmt:v3.2.0-alpine
+  stage: test
+  before_script:
+    - shfmt -version
+  script:
+    - shfmt -i 2 -ci wiper.sh  # path to your shell scripts
+
+unit:
+  image: debian:stable-slim
+  stage: test
+  before_script:
+    - apt-get update
+    - apt-get install -y lsof
+    - chmod +x ./wiper.sh
+    - ls -al
+    - ./wiper.sh version
+  script:
+    - ./wiper.sh private
+    - |
+      if [[ -f /tmp/open_logs.txt ]]; then
+        cat /tmp/open_logs.txt
+      fi
