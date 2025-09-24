@@ -513,7 +513,7 @@ __recursive_action() {
             ;;
         esac
       else
-        warn "Recursive mode {--recursive} is off. ${ORANGE}I did not ${action,,}${NC} $(__add_trailing_slash "${dir}")"
+        warn "Recursive mode {--recursive} is off. ${ORANGE}I did not $(echo "${action}" | tr '[:upper:]' '[:lower:]')${NC} $(__add_trailing_slash "${dir}")"
       fi
     done
   fi
@@ -864,7 +864,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-set -- "${POSITIONAL[@]}" # restore positional parameters
+set -- "${POSITIONAL[@]-}" # restore positional parameters
 
 if [[ -z ${1-} ]] && [[ ${PRIVATE} == false ]] && [[ ${DISABLE_LOGGING} == false ]]; then
   err "Feed me with file or path to wipe, or go private {wiper private}"
