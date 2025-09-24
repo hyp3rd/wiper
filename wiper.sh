@@ -160,6 +160,7 @@ VERSION="v1.0"
 OS=""
 LOCAL_USERS=()
 DETECTED_LOGS_FILES=()
+SKIPPED_FILES=()
 ITERATIONS=8
 TIMESPAN=120
 
@@ -182,7 +183,7 @@ __is_root() {
 }
 
 #######################################
-# Determine a file or a dir is writable by the current user
+# Determine if a file or a dir is writable by the current user
 # Globals:
 #   None
 # Arguments:
@@ -195,6 +196,23 @@ __can_write() {
     return 0
   fi
   err "You don't have write permissions on $(pwd)/$1"
+  return 1
+}
+
+#######################################
+# Check if a file is zero bytes and should be skipped
+# Globals:
+#   SKIPPED_FILES
+# Arguments:
+#   A file path
+# Returns:
+#   0 if file should be skipped (is zero bytes), 1 otherwise
+#######################################
+__is_zero_bytes() {
+  if [[ -f "$1" ]] && [[ ! -s "$1" ]]; then
+    SKIPPED_FILES+=("$(pwd)/$1")
+    return 0
+  fi
   return 1
 }
 
@@ -257,6 +275,26 @@ __command_exists() {
   command -v "$@" >/dev/null 2>&1
 }
 
+#######################################
+# Display summary of skipped zero-byte files
+# Globals:
+#   SKIPPED_FILES
+# Arguments:
+#   None
+# Outputs:
+#   Writes the summary to stdout
+#######################################
+__report_skipped_files() {
+  if [[ ${#SKIPPED_FILES[@]} -gt 0 ]]; then
+    echo
+    info "Summary: Skipped ${#SKIPPED_FILES[@]} zero-byte file(s)"
+    for skipped_file in "${SKIPPED_FILES[@]}"; do
+      echo -e "  ${ORANGE}[-]${NC} ${skipped_file}"
+    done
+    echo
+  fi
+}
+
 ### Internal Helpers: END
 
 ### Secure Wipe
@@ -298,7 +336,8 @@ END_DOC
     done
     printf "\n"
   else
-    warn "The file ${ORANGE}$(pwd)/$1${NC} is zero bytes"
+    # File is zero bytes, already handled by __is_zero_bytes
+    return 0
   fi
 }
 
@@ -326,10 +365,10 @@ secure_wipe() {
     read -r wipeFiles
     echo
 
-    [[ ${wipeFiles,,} == "y" ]] || abort
+    [[ $(echo "${wipeFiles}" | tr '[:upper:]' '[:lower:]') == "y" ]] || abort
   fi
 
-  if [[ -f "$1" ]] && __can_write "$1"; then
+  if [[ -f "$1" ]] && __can_write "$1" && ! __is_zero_bytes "$1"; then
     __secure_wipe "$1"
   elif [[ -d "$1" ]] && __can_write "$1" && [[ -n $(ls -A "$1") ]]; then
     local directories=()
@@ -338,7 +377,7 @@ secure_wipe() {
       if [[ -d $i ]]; then
         directories+=("$i")
       else
-        __can_write "$i" && __secure_wipe "$i"
+        __can_write "$i" && ! __is_zero_bytes "$i" && __secure_wipe "$i"
       fi
     done
     __recursive_action "WIPE" directories
@@ -349,6 +388,7 @@ secure_wipe() {
     printf "\n"
     err "The directory is empty, or the file is not readable ${RED}[-]${NC}...${RED}$(__add_trailing_slash "$1")${NC}"
   fi
+  __report_skipped_files
   echo
 }
 
@@ -374,6 +414,9 @@ Colloquially it is also called the bit-bucket or the blackhole because it immedi
 
 of={file} - "of" stands for Out File. We are writing over a file, so we type our file name here.
 END_DOC
+  if __is_zero_bytes "$1"; then
+    return 0
+  fi
   dd if="/dev/null" of="$1"
   log "Successfully erased the content of ...${GREEN}$(pwd)/$1${NC}"
 }
@@ -399,7 +442,7 @@ erase() {
   fi
 
   if [[ -f $1 ]]; then
-    __can_write "$1" && __erase "$1"
+    __can_write "$1" && ! __is_zero_bytes "$1" && __erase "$1"
   elif [[ -d "$1" ]] && __can_write "$1" && [[ -n $(ls -A "$1") ]]; then
     local directories=()
     pushd "$1" > /dev/null
@@ -407,7 +450,7 @@ erase() {
       if [[ -d $i ]]; then
         directories+=("$i")
       else
-        __can_write "$i" && __erase "$i"
+        __can_write "$i" && ! __is_zero_bytes "$i" && __erase "$i"
       fi
     done
     __recursive_action "ERASE" directories
@@ -416,6 +459,7 @@ erase() {
   else
     err "The directory is empty, or the file is not readable ${RED}[-]${NC}...$(__add_trailing_slash "$1")"
   fi
+  __report_skipped_files
   echo
 }
 
@@ -433,8 +477,11 @@ erase() {
 #   Writes the results to stdout
 #######################################
 __remove() {
-  rm -rf "${i:?}"
-  log "Successfully removed ...${GREEN}$(pwd)/$i${NC}"
+  if __is_zero_bytes "$1"; then
+    return 0
+  fi
+  rm -rf "$1"
+  log "Successfully removed ...${GREEN}$(pwd)/$1${NC}"
 }
 
 #######################################
@@ -473,6 +520,7 @@ remove() {
   else
     warn "Directory empty or file not readable ${ORANGE}[-]${NC}...$(__add_trailing_slash "$1")"
   fi
+  __report_skipped_files
   echo
 }
 
@@ -712,8 +760,10 @@ __clear_logs() {
 
   while IFS= read -r -d $'\0'; do
     echo -ne "${GREEN}[!]${NC} Wiping ${ORANGE}[-]${NC}...${REPLY}\r"
-    __can_write "$REPLY" && secure_wipe "$REPLY" && erase "$REPLY"
-    echo -e "${GREEN}[√]${NC} Wiped ${GREEN}[+]${NC}...${REPLY}."
+    if __can_write "$REPLY" && ! __is_zero_bytes "$REPLY"; then
+      secure_wipe "$REPLY" && erase "$REPLY"
+      echo -e "${GREEN}[√]${NC} Wiped ${GREEN}[+]${NC}...${REPLY}."
+    fi
   done < <(find / -type f -name "*.log" -newerct "${TIMESPAN} minutes ago" -print0)
 
   # backwords compatible
