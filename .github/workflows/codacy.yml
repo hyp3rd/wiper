@@ -1,3 +1,4 @@
+---
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
 # separate terms of service, privacy policy, and support
@@ -20,27 +21,32 @@ on:
     # The branches below must be a subset of the branches above
     branches: [ "main" ]
   schedule:
-    - cron: '20 15 * * 4'
+    - cron: "40 11 * * 5"
 
 permissions:
   contents: read
 
 jobs:
   codacy-security-scan:
+    outputs:
+      sarif_matrix: ${{ steps.split-sarif.outputs.matrix }}
     permissions:
-      contents: read # for actions/checkout to fetch code
-      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
-      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+      # for actions/checkout to fetch code
+      contents: read
+      # for github/codeql-action/upload-sarif to upload SARIF results
+      security-events: write
+      # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+      actions: read
     name: Codacy Security Scan
     runs-on: ubuntu-latest
     steps:
       # Checkout the repository to the GitHub Actions runner
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       # Execute Codacy Analysis CLI and generate a SARIF output with the security issues identified during the analysis
       - name: Run Codacy Analysis CLI
-        uses: codacy/codacy-analysis-cli-action@d840f886c4bd4edc059706d09c6a1586111c540b
+        uses: codacy/codacy-analysis-cli-action@562ee3e92b8e92df8b67e0a5ff8aa8e261919c08
         with:
           # Check https://github.com/codacy/codacy-analysis-cli#project-token to get your project token from your Codacy repository
           # You can also omit the token and run the tools that support default configurations
@@ -54,8 +60,94 @@ jobs:
           # This will handover control about PR rejection to the GitHub side
           max-allowed-issues: 2147483647
 
-      # Upload the SARIF file generated in the previous step
-      - name: Upload SARIF results file
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Normalize and split SARIF runs
+        id: split-sarif
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          max_runs = 20
+
+          with open("results.sarif", "r", encoding="utf-8") as f:
+              sarif = json.load(f)
+
+          runs = sarif.get("runs", [])
+          if not runs:
+              raise SystemExit("results.sarif has no runs")
+
+          for idx, run in enumerate(runs):
+              auto = run.get("automationDetails") or {}
+              base = auto.get("id") or "codacy"
+              auto["id"] = f"{base}-{idx}"
+              run["automationDetails"] = auto
+
+          outdir = Path("sarif-chunks")
+          outdir.mkdir(parents=True, exist_ok=True)
+
+          base_payload = {k: v for k, v in sarif.items() if k != "runs"}
+          include = []
+
+          for chunk_idx, start in enumerate(range(0, len(runs), max_runs)):
+              chunk_runs = runs[start : start + max_runs]
+              chunk_file = outdir / f"results-{chunk_idx:03d}.sarif"
+
+              payload = dict(base_payload)
+              payload["runs"] = chunk_runs
+              chunk_file.write_text(json.dumps(payload), encoding="utf-8")
+
+              include.append(
+                  {
+                      "file": chunk_file.name,
+                      "category": f"codacy-{chunk_idx:03d}",
+                  }
+              )
+
+          matrix = json.dumps({"include": include}, separators=(",", ":"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"matrix={matrix}\n")
+
+          print(f"Prepared {len(include)} SARIF chunk(s)")
+          PY
+
+      - name: Upload SARIF chunks artifact
+        uses: actions/upload-artifact@v7
         with:
-          sarif_file: results.sarif
+          name: codacy-sarif-chunks
+          path: sarif-chunks/*.sarif
+          if-no-files-found: error
+
+  codacy-security-upload:
+    name: Codacy Security Scan Upload
+    needs: codacy-security-scan
+    if: ${{ needs.codacy-security-scan.outputs.sarif_matrix != '' }}
+    permissions:
+      # for actions/checkout to fetch code
+      contents: read
+      # for github/codeql-action/upload-sarif to upload SARIF results
+      security-events: write
+      # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+      actions: read
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.codacy-security-scan.outputs.sarif_matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Download SARIF chunks artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: codacy-sarif-chunks
+          path: sarif-chunks
+
+      - name: Verify SARIF chunk path
+        run: ls -la sarif-chunks
+
+      - name: Upload SARIF chunk
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif-chunks/${{ matrix.file }}
+          category: ${{ matrix.category }}
